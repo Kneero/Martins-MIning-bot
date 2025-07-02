@@ -5,7 +5,9 @@ from telegram import Bot
 from dotenv import load_dotenv
 import requests
 import feedparser
-from datetime import datetime, timedelta
+from datetime import datetime
+from flask import Flask
+from threading import Thread
 
 # Load secrets from .env file
 load_dotenv()
@@ -33,7 +35,7 @@ except Exception as e:
 # Mining-related search terms
 SEARCH_TERMS = [
     "new mining app",
-    "testnet mining", 
+    "testnet mining",
     "depin crypto",
     "mobile mining",
     "airdrop mining",
@@ -53,7 +55,7 @@ NEWS_FEEDS = [
 # Reddit subreddits (using JSON feeds)
 REDDIT_SOURCES = [
     "https://www.reddit.com/r/CryptoCurrency/new.json?limit=10",
-    "https://www.reddit.com/r/defi/new.json?limit=10", 
+    "https://www.reddit.com/r/defi/new.json?limit=10",
     "https://www.reddit.com/r/CryptoMoonShots/new.json?limit=10",
     "https://www.reddit.com/r/altcoin/new.json?limit=10",
     "https://www.reddit.com/r/ethereum/new.json?limit=10"
@@ -62,8 +64,7 @@ REDDIT_SOURCES = [
 # Track seen content
 seen_items = {
     'news': set(),
-    'reddit': set(),
-    'twitter': set()
+    'reddit': set()
 }
 
 def send_telegram_message(message):
@@ -88,27 +89,24 @@ def send_telegram_message(message):
         return False
 
 def check_keywords(text, keywords):
-    """Check if any keywords are present in the text"""
     text_lower = text.lower()
     return any(keyword.lower() in text_lower for keyword in keywords)
 
 def scrape_news_feeds():
-    """Scrape RSS news feeds for relevant content"""
     print("🔍 Checking news feeds...")
     found_items = []
-    
+
     for feed_url in NEWS_FEEDS:
         try:
             print(f"  📰 Checking {feed_url}")
             feed = feedparser.parse(feed_url)
-            
-            for entry in feed.entries[:5]:  # Check latest 5 entries
+
+            for entry in feed.entries[:5]:
                 title = entry.get('title', '')
                 description = entry.get('description', '')
                 link = entry.get('link', '')
                 published = entry.get('published', '')
-                
-                # Check if content matches our keywords
+
                 content_text = f"{title} {description}"
                 if check_keywords(content_text, SEARCH_TERMS):
                     item_id = f"news_{hash(link)}"
@@ -122,42 +120,39 @@ def scrape_news_feeds():
                             'source': feed.feed.get('title', 'News'),
                             'published': published
                         })
-                        
         except Exception as e:
             print(f"❌ Error checking feed {feed_url}: {e}")
             continue
-    
+
     return found_items
 
 def scrape_reddit():
-    """Scrape Reddit for relevant posts"""
     print("🔍 Checking Reddit...")
     found_items = []
-    
+
     headers = {
         'User-Agent': 'python:crypto-mining-bot:v1.0.0 (by /u/cryptobot)'
     }
-    
+
     for reddit_url in REDDIT_SOURCES:
         try:
             subreddit_name = reddit_url.split('/r/')[1].split('/')[0]
             print(f"  🔴 Checking r/{subreddit_name}")
-            
+
             response = requests.get(reddit_url, headers=headers, timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                
-                for post in data['data']['children'][:5]:  # Check latest 5 posts
+
+                for post in data['data']['children'][:5]:
                     post_data = post['data']
                     title = post_data.get('title', '')
                     selftext = post_data.get('selftext', '')
                     url = f"https://reddit.com{post_data.get('permalink', '')}"
                     score = post_data.get('score', 0)
                     created_utc = post_data.get('created_utc', 0)
-                    
-                    # Check if content matches our keywords
+
                     content_text = f"{title} {selftext}"
-                    if check_keywords(content_text, SEARCH_TERMS) and score > 5:  # Only posts with some upvotes
+                    if check_keywords(content_text, SEARCH_TERMS) and score > 5:
                         item_id = f"reddit_{post_data.get('id', '')}"
                         if item_id not in seen_items['reddit']:
                             seen_items['reddit'].add(item_id)
@@ -170,15 +165,13 @@ def scrape_reddit():
                                 'score': score,
                                 'created': datetime.fromtimestamp(created_utc).strftime('%Y-%m-%d %H:%M')
                             })
-                            
         except Exception as e:
             print(f"❌ Error checking Reddit {reddit_url}: {e}")
             continue
-    
+
     return found_items
 
 def send_news_alert(item):
-    """Send news alert to Telegram"""
     try:
         if item['type'] == 'news':
             message = f"📰 <b>Crypto News Alert</b>\n\n"
@@ -187,7 +180,7 @@ def send_news_alert(item):
             message += f"📅 {item['published']}\n"
             message += f"🔗 <a href='{item['link']}'>Read More</a>\n"
             message += f"📡 Source: {item['source']}"
-            
+
         elif item['type'] == 'reddit':
             message = f"🔴 <b>Reddit Alert - r/{item['subreddit']}</b>\n\n"
             message += f"<b>{html.escape(item['title'])}</b>\n\n"
@@ -195,24 +188,15 @@ def send_news_alert(item):
                 message += f"{html.escape(item['text'])}\n\n"
             message += f"👍 Score: {item['score']} | 📅 {item['created']}\n"
             message += f"🔗 <a href='{item['link']}'>View Post</a>"
-            
-        elif item['type'] == 'twitter':
-            username = item['user']['username']
-            text = html.escape(item['content'])
-            link = item['url']
-            message = f"🔔 <b>Twitter Alert</b>\n\n"
-            message += f"<b>@{username}</b>\n\n{text}\n\n🔗 <a href='{link}'>View Tweet</a>"
 
         if send_telegram_message(message):
             print(f"✅ Sent {item['type']} alert to Telegram")
         else:
             print(f"❌ Failed to send {item['type']} alert")
-            
     except Exception as e:
         print(f"❌ Error sending alert: {e}")
 
 def test_bot():
-    """Send a test message to verify bot is working"""
     print("🧪 Testing bot connectivity...")
     test_message = """🤖 <b>Multi-Source Crypto Bot Test!</b>
 
@@ -237,7 +221,6 @@ If you received this, your multi-source setup is working perfectly! 🚀"""
         return False
 
 def run_multi_source_bot():
-    """Main bot function with multiple data sources"""
     if not test_bot():
         print("❌ Bot test failed. Exiting.")
         return
@@ -246,34 +229,28 @@ def run_multi_source_bot():
 
     while True:
         try:
-            # Check news feeds
             news_items = scrape_news_feeds()
             for item in news_items:
                 send_news_alert(item)
-                time.sleep(2)  # Small delay between messages
+                time.sleep(2)
 
-            # Check Reddit
             reddit_items = scrape_reddit()
             for item in reddit_items:
                 send_news_alert(item)
                 time.sleep(2)
 
-            print(f"⏳ Cycle complete. Found {len(news_items)} news items and {len(reddit_items)} Reddit posts.")
+            print(f"⏳ Cycle complete. Found {len(news_items)} news and {len(reddit_items)} Reddit posts.")
             print("⏳ Waiting 10 minutes before next check...")
-            time.sleep(600)  # Wait 10 minutes
+            time.sleep(600)
 
         except KeyboardInterrupt:
             print("🛑 Bot stopped by user")
             break
         except Exception as e:
             print(f"❌ Error in main loop: {e}")
-            time.sleep(60)  # Wait 1 minute before retrying
+            time.sleep(60)
 
-# Run the multi-source bot
-from flask import Flask
-from threading import Thread
-import os
-
+# Flask dummy web server to keep Render service alive
 app = Flask(__name__)
 
 @app.route('/')
@@ -281,12 +258,6 @@ def home():
     return "🚀 Crypto bot is running!"
 
 if __name__ == '__main__':
-    # Start Telegram bot in the background
     Thread(target=run_multi_source_bot).start()
-
-    # Start dummy Flask server
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
-
-
-
