@@ -305,3 +305,21 @@ def run_multi_source_bot():
 
 # Run the multi-source bot
 run_multi_source_bot()
+# Add dummy web server to keep Render Web Service happy
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "🚀 Crypto bot is running!"
+
+if __name__ == '__main__':
+    from threading import Thread
+
+    # Run the Telegram bot in a background thread
+    Thread(target=run_multi_source_bot).start()
+
+    # Start the dummy web server on port 10000
+    app.run(host='0.0.0.0', port=10000)
+
