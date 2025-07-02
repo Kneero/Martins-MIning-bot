@@ -3,3 +3,4 @@ snscrape
 python-dotenv
 requests
 telegram
+feedparser
