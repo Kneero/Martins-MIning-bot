@@ -24,9 +24,7 @@ print(f"✅ Bot configured with CHAT_ID: {CHAT_ID}")
 # Initialize bot
 try:
     bot = Bot(token=BOT_TOKEN)
-    # Test the bot connection
-    bot_info = bot.get_me()
-    print(f"✅ Bot connected: @{bot_info.username}")
+    print(f"✅ Bot initialized successfully")
 except Exception as e:
     print(f"❌ Failed to initialize bot: {e}")
     exit(1)
@@ -65,8 +63,20 @@ def send_to_telegram(tweet):
         text = html.escape(tweet['content'])
         link = tweet['url']
         message = f"🔔 New tweet by @{username}:\n\n{text}\n\n🔗 {link}"
-        bot.send_message(chat_id=CHAT_ID, text=message)
-        print(f"✅ Sent tweet {tweet_id} to Telegram")
+        
+        # Use requests to send message directly to Telegram API
+        import requests
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        payload = {
+            'chat_id': CHAT_ID,
+            'text': message,
+            'parse_mode': 'HTML'
+        }
+        response = requests.post(url, data=payload)
+        if response.status_code == 200:
+            print(f"✅ Sent tweet {tweet_id} to Telegram")
+        else:
+            print(f"❌ Failed to send message: {response.text}")
     except Exception as e:
         print(f"❌ Error sending to Telegram: {e}")
 
