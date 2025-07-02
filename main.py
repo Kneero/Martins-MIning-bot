@@ -1,4 +1,3 @@
-
 import os
 import time
 import html
@@ -271,9 +270,9 @@ def run_multi_source_bot():
             time.sleep(60)  # Wait 1 minute before retrying
 
 # Run the multi-source bot
-run_multi_source_bot()
-# Add dummy web server to keep Render Web Service happy
 from flask import Flask
+from threading import Thread
+import os
 
 app = Flask(__name__)
 
@@ -282,11 +281,12 @@ def home():
     return "🚀 Crypto bot is running!"
 
 if __name__ == '__main__':
-    from threading import Thread
-
-    # Run the Telegram bot in a background thread
+    # Start Telegram bot in the background
     Thread(target=run_multi_source_bot).start()
 
-    # Start the dummy web server on port 10000
-    app.run(host='0.0.0.0', port=10000)
+    # Start dummy Flask server
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+
 
