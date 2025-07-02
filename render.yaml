@@ -1,12 +1,12 @@
 services:
-  - type: worker
+  - type: web
     name: mining-alert-bot
     env: python
-    runtime: python-3.10
-    buildCommand: ""
+    plan: free
+    buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     envVars:
       - key: BOT_TOKEN
-        fromDotEnv: true
+        sync: false
       - key: CHAT_ID
-        fromDotEnv: true
+        sync: false
