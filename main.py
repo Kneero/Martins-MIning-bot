@@ -1,12 +1,9 @@
 
 import os
-import subprocess
-import json
 import time
 import html
 from telegram import Bot
 from dotenv import load_dotenv
-import ssl
 import requests
 import feedparser
 from datetime import datetime, timedelta
@@ -181,23 +178,6 @@ def scrape_reddit():
     
     return found_items
 
-def scrape_tweets(query):
-    """Keep the original Twitter scraping as backup"""
-    try:
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-
-        command = f"snscrape --jsonl --max-results 3 --retry 1 twitter-search '{query}'"
-        env = os.environ.copy()
-        env['PYTHONHTTPSVERIFY'] = '0'
-        env['SSL_VERIFY'] = 'false'
-        output = subprocess.check_output(command, shell=True, text=True, env=env, timeout=20)
-        tweets = [json.loads(line) for line in output.strip().split('\n') if line]
-        return tweets
-    except Exception:
-        return []  # Silently fail for Twitter since we have other sources
-
 def send_news_alert(item):
     """Send news alert to Telegram"""
     try:
@@ -237,10 +217,9 @@ def test_bot():
     print("🧪 Testing bot connectivity...")
     test_message = """🤖 <b>Multi-Source Crypto Bot Test!</b>
 
-✅ <b>Your bot is now monitoring:</b>
+✅ <b>Martins Mining bot is now monitoring:</b>
 📰 News feeds (CoinTelegraph, CoinDesk, etc.)
 🔴 Reddit (r/CryptoCurrency, r/defi, etc.)  
-🐦 Twitter (when available)
 
 🎯 <b>Searching for:</b>
 • New mining apps
@@ -279,18 +258,6 @@ def run_multi_source_bot():
             for item in reddit_items:
                 send_news_alert(item)
                 time.sleep(2)
-
-            # Try Twitter as backup (might fail silently)
-            print("🔍 Checking Twitter (backup)...")
-            for term in SEARCH_TERMS[:2]:  # Just check 2 terms to save time
-                tweets = scrape_tweets(term)
-                for tweet in tweets:
-                    tweet_id = tweet['id']
-                    if tweet_id not in seen_items['twitter']:
-                        seen_items['twitter'].add(tweet_id)
-                        tweet['type'] = 'twitter'
-                        send_news_alert(tweet)
-                        time.sleep(2)
 
             print(f"⏳ Cycle complete. Found {len(news_items)} news items and {len(reddit_items)} Reddit posts.")
             print("⏳ Waiting 10 minutes before next check...")
