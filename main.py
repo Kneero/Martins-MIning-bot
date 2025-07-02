@@ -27,7 +27,7 @@ seen_tweet_ids = set()
 
 def scrape_tweets(query):
     try:
-        command = f"snscrape --jsonl --max-results 5 'twitter-search \"{query}\"'"
+        command = f"snscrape --jsonl --max-results 5 twitter-search '{query}'"
         output = subprocess.check_output(command, shell=True, text=True)
         tweets = [json.loads(line) for line in output.strip().split('\n') if line]
         return tweets
